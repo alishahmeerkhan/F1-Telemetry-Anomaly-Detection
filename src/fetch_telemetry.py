@@ -21,15 +21,24 @@ def fetch_data(year, track, driver, session_name):
 
     try:
         session = fastf1.get_session(year, track, session_name)
-        session.load(telemetry=True, weather=False, messages=False)
+        session.load(telemetry=True, weather=False, messages=True)
 
-        driver_laps = session.laps.pick_driver(driver)
+        driver_laps = session.laps.pick_drivers(driver)
 
         if driver_laps.empty:
             print(f'[bold yellow]Warning: No laps found for {driver} in {session_name}. Skipping.[/bold yellow]')
             return
 
-        telemetry = driver_laps.get_telemetry()
+        if session_name in ['FP1', 'FP2', 'FP3', 'Q']:
+            valid_laps = driver_laps[
+                (driver_laps['IsAccurate'] == True) &
+                (driver_laps['Deleted'] == True) &
+                (driver_laps['TrackStatus'] == '1')
+            ]
+        else:
+            valid_laps = driver_laps
+
+        telemetry = valid_laps.get_telemetry()
 
         df = pd.DataFrame(telemetry)
 
