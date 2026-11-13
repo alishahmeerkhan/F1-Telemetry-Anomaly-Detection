@@ -23,6 +23,7 @@ def fetch_data(year, track, driver, session_name):
         session = fastf1.get_session(year, track, session_name)
         session.load(telemetry=True, weather=False, messages=True)
 
+        file_label = ''
         driver_laps = session.laps.pick_drivers(driver)
 
         if driver_laps.empty:
@@ -32,9 +33,25 @@ def fetch_data(year, track, driver, session_name):
         if session_name in ['FP1', 'FP2', 'FP3', 'Q']:
             valid_laps = driver_laps[
                 (driver_laps['IsAccurate'] == True) &
-                (driver_laps['Deleted'] == True) &
+                (driver_laps['Deleted'] == False) &
                 (driver_laps['TrackStatus'] == '1')
             ]
+
+            if valid_laps.empty:
+                print(f'[bold yellow]Tier 1 Validation failed for {session_name}.[/bold yellow] Applying Tier 2 Relaxed...')
+                file_label = '_Tier2_Relaxed'
+                valid_laps = driver_laps[
+                                (driver_laps['IsAccurate'] == True) &
+                                (driver_laps['Deleted'] == False)
+                            ]  
+
+            if valid_laps.empty:
+                print(f'[bold yellow]Tier 2 Validation failed for {session_name}.[/bold yellow] Applying Tier 3 Fallback...')
+                file_label = '_Tier3_Fallback'
+                valid_laps = driver_laps[
+                                driver_laps['PitOutTime'].isnull() &
+                                driver_laps['PitInTime'].isnull()
+                            ]
         else:
             valid_laps = driver_laps
 
@@ -42,7 +59,7 @@ def fetch_data(year, track, driver, session_name):
 
         df = pd.DataFrame(telemetry)
 
-        filename = f'{year}_{track}_{driver}_{session_name}.csv'
+        filename = f'{year}_{track}_{driver}_{session_name}{file_label}.csv'
         file_path = os.path.join(RAW_DATA_DIR, filename)
 
         df.to_csv(file_path, index=False)
