@@ -19,7 +19,7 @@ def load_and_merge_training_data(sessions):
 def preprocess_for_autoencoder(df_train, df_val):
     scalar = MinMaxScaler()
 
-    train_scaled = scalar.fit_transformd(df_train)
+    train_scaled = scalar.fit_transform(df_train)
     val_scaled = scalar.fit_transform(df_val)
 
     return train_scaled, val_scaled, scalar
