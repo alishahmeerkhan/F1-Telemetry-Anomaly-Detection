@@ -10,6 +10,7 @@ from preprocess import load_and_merge_training_data
 AUTOENCODER_PATH = 'models/autoencoder.pth'
 SCALAR_PATH = 'models/minmax_scalar.pkl'
 DATA_PATH = 'data/raw'
+threshold = 0.5
 
 class TelemetryAutoencoder(nn.Module):
     def __init__(self):
@@ -41,19 +42,38 @@ def detect():
     print(f'> Loading Autoencoder from {AUTOENCODER_PATH}.')
     autoencoder = load_autoencoder()
     print(f'> Loading telemetry data from {DATA_PATH}.')
-    df = prepare_data()
+    df_raw, race_tensor = prepare_data()
 
     print(f'\n\n[bold green]Models and Data successfully loaded.[/bold green]')
+
+    with torch.no_grad():
+        reconstructed = autoencoder(race_tensor)
+
+    mse_per_row = torch.mean((race_tensor - reconstructed) ** 2, dim=1).numpy()
+
+    df_raw['MSE'] = mse_per_row
+    df_raw['isAnomaly'] = df_raw['MSE'] > threshold
+
+    anomalies = df_raw[df_raw['isAnomaly'] == True]
+    generate_report(mse_per_row.max(), len(anomalies), len(df_raw))
+
+def generate_report(max_mse, size_anomalies, size_df):
+    print('\n\n' + '-' * 75)
+    print(f'[bold cyan]Detection Complete.[/bold cyan]')
+    print(f'Total rows scanned: {size_df}')
+    print(f'Anomalies flagged (MSE > {threshold}): [bold red]{size_anomalies}[/bold red]')
+    print(f'Max MSE recorded: {max_mse:.6f}')
+    print('-' * 75)
 
 def prepare_data():
     df_merged = load_and_merge_training_data(['R'])
     print(f'\n\nData loaded and merged into dataframe -> {df_merged.shape}')
 
     scalar = load_scalar()
-    df_scaled = scalar.transform(df_merged)
-    df = torch.FloatTensor(df_scaled)
+    df_scaled = scalar.transform(df_merged.values)
+    tensor_data = torch.FloatTensor(df_scaled)
     
-    return df
+    return df_merged, tensor_data
 
 def load_autoencoder():
     if os.path.exists(AUTOENCODER_PATH):
