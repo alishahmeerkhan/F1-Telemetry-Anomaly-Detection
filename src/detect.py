@@ -11,7 +11,7 @@ from preprocess import load_and_merge_training_data
 AUTOENCODER_PATH = 'models/autoencoder.pth'
 SCALAR_PATH = 'models/minmax_scalar.pkl'
 DATA_PATH = 'data/raw'
-THRESHOLD = 0.225
+THRESHOLD = 0.12
 
 class TelemetryAutoencoder(nn.Module):
     def __init__(self):
