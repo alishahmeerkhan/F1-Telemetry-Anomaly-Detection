@@ -7,9 +7,11 @@ import torch.nn as nn
 from rich import print
 import torch.optim as optim
 
+from numpy import mean
+from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
-from preprocess import load_and_merge_training_data
+from preprocess import load_and_merge_training_data, preprocess_for_autoencoder
 
 training_sessions = ['FP1', 'FP2', 'FP3', 'Q']
 
@@ -95,6 +97,37 @@ def train_autoencoder():
 
     print('Training complete. Model and Scalar saved to ../models/baseline directory.')
 
+def train_pca():
+    print('> Loading and preparing data...')
+    df = load_and_merge_training_data(training_sessions)
+    print(f'\nData loaded and merged into dataframe -> {df.shape}')
+
+    X_train, X_val = train_test_split(df.values, test_size=0.2, random_state=42)
+    X_train_scaled, X_val_scaled, scalar = preprocess_for_autoencoder(X_train, X_val)
+
+    print('\nFitting PCA (n_components = 3)...')
+    pca = PCA(n_components=3)
+    X_train_z = pca.fit_transform(X_train_scaled)
+    X_train_reconstructed = pca.inverse_transform(X_train_z)
+
+    X_val_z = pca.transform(X_val_scaled)
+    X_val_reconstructed = pca.inverse_transform(X_val_z)
+
+    train_mse = mean((X_train_scaled - X_train_reconstructed) ** 2)
+    val_mse = mean((X_val_scaled - X_val_reconstructed) ** 2)
+
+
+    print(f'\n\n[bold green]--- PCA training complete ---[/bold green]')
+    print(f'Explained Variance Ratio : {pca.explained_variance_ratio_.round(4)} (Total: {pca.explained_variance_ratio_.sum():.4f})')
+    print(f'Train MSE                : {train_mse:.6f}')
+    print(f'Val MSE                  : {val_mse:.6f}')
+
+    os.makedirs('models/baseline', exist_ok=True)
+    joblib.dump(pca, 'models/baseline/baseline_pca.pkl')
+    joblib.dump(scalar, 'models/baseline/baseline_scalar.pkl')
+    print('PCA model saved to [bold cyan]models/baseline/baseline_pca.pkl[/bold cyan]')
+    print('Scaler saved to [bold cyan]models/baseline/baseline_pca.pkl[/bold cyan]')
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Choose between two baseline models for training.')
 
@@ -113,4 +146,4 @@ if __name__ == '__main__':
 
     if args.pca:
         print('MODE: [bold cyan]Training PCA as baseline model...[/bold cyan]')
-        print('[bold yellow]Sorry, its implementation is not complete yet...[/bold yellow]')
+        train_pca()
